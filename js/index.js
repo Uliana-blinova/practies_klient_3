@@ -1,1 +1,9 @@
-console.log('Happy developing ✨')
+let app = new Vue({
+    el: '#app',
+    data: {
+        tasks: []
+    },
+    methods: {
+
+    }
+})
