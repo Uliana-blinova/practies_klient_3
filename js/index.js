@@ -218,6 +218,55 @@ Vue.component('task-form', {
             required: true
         }
     },
+    template: `
+    <div class="form-container">
+            <h3>{{ task.id ? 'Редактирование задачи' : 'Новая задача' }}</h3>
+            <form @submit.prevent="submit">
+                <div class="form-group">
+                    <label>Заголовок:</label>
+                    <input v-model="localTask.title" required>
+                </div>
+                <div class="form-group">
+                    <label>Описание:</label>
+                    <textarea v-model="localTask.description" required></textarea>
+                </div>
+                <div class="form-group">
+                    <label>Дэдлайн:</label>
+                    <input type="date" v-model="localTask.deadline" required>
+                </div>
+                <div v-if="errors.length" class="errors">
+                    <ul>
+                        <li v-for="error in errors">{{ error }}</li>
+                    </ul>
+                </div>
 
+                <div class="buttons">
+                    <button type="submit">Сохранить</button>
+                    <button type="button" @click="cancel">Отмена</button>
+                </div>
+            </form>
+        </div>
+    `,
+    data(){
+        return {
+            localTask:{...this.task},
+            errors: []
+        }
+    },
+    methods: {
+        submit(){
+            this.errors = [];
+            if (!this.localTask.title) this.errors.push("Заголовок обязателен");
+            if (!this.localTask.description) this.errors.push("Описание обязательно");
+            if (!this.localTask.deadline) this.errors.push("Дэдлайн обязателен");
+
+            if (this.errors.length === 0) {
+                this.$emit('submit', this.localTask);
+            }
+        },
+        cancel() {
+            this.$emit('cancel');
+        }
+    }
 })
 
