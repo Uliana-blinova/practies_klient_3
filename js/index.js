@@ -119,3 +119,105 @@ Vue.component('task-card', {
     }
 
 })
+
+Vue.component('kanban-board', {
+    template: `
+        <div class="board">
+            <kanban-column 
+                v-for="col in columns" 
+                :key="col.status"
+                :title="col.title" 
+                :status="col.status"
+                :tasks="getTasksForStatus(col.status)"
+                @move-task="moveTask"
+                @edit-task="openEditForm"
+                @delete-task="deleteTask"
+                @create-task="openCreateForm"
+            ></kanban-column>
+            
+            <div v-if="showForm" class="modal">
+                <task-form 
+                    :task="currentTask" 
+                    @submit="saveTask" 
+                    @cancel="showForm = false"
+                ></task-form>
+            </div>
+        </div>
+    `,
+    data() {
+        return {
+            columns: [
+                { title: 'Запланированные задачи', status: 'planned' },
+                { title: 'Задачи в работе', status: 'in_progress' },
+                { title: 'Тестирование', status: 'testing' },
+                { title: 'Выполненные задачи', status: 'done' }
+            ],
+            tasks: [],
+            showForm: false,
+            currentTask: null
+        }
+    },
+    methods: {
+        getTasksForStatus(status) {
+            return this.tasks.filter(t => t.status === status);
+        },
+        moveTask(payload) {
+            const task = this.tasks.find(t => t.id === payload.id);
+            if (task) {
+                task.status = payload.status;
+                task.updatedAt = new Date().toLocaleString();
+                if (payload.reason) {
+                    task.returnReason = payload.reason;
+                } else {
+                    task.returnReason = '';
+                }
+                if (payload.status === 'done') {
+                }
+            }
+        },
+        deleteTask(id) {
+            this.tasks = this.tasks.filter(t => t.id !== id);
+        },
+        openCreateForm(status) {
+            this.currentTask = {
+                id: Date.now(),
+                title: '',
+                description: '',
+                deadline: '',
+                createdAt: new Date().toLocaleString(),
+                updatedAt: new Date().toLocaleString(),
+                status: status,
+                returnReason: ''
+            };
+            this.showForm = true;
+        },
+        openEditForm(task) {
+            this.currentTask = { ...task };
+            this.showForm = true;
+        },
+        saveTask(taskData) {
+            if (taskData.id) {
+                const index = this.tasks.findIndex(t => t.id === taskData.id);
+                if (index !== -1) {
+                    taskData.updatedAt = new Date().toLocaleString();
+                    this.tasks[index] = taskData;
+                }
+            } else {
+                this.tasks.push(taskData);
+            }
+            this.showForm = false;
+            this.currentTask = null;
+        }
+    }
+});
+
+Vue.component('task-form', {
+    props: {
+        task:{
+            type: Object,
+            required: true
+        }
+    },
+
+})
+
