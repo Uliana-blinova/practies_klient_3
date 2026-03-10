@@ -55,3 +55,67 @@ Vue.component('kanban-column', {
         }
     }
 })
+
+Vue.component('task-card', {
+    props:{
+        task:{
+            type:Object,
+            required:true
+        },
+        currentStatus: {
+            type: String,
+            required: true
+        }
+    },
+    template: `
+    <div class="card" :class="{ 'overdue': isOverdue }">
+            <h3>{{ task.title }}</h3>
+            <p>{{ task.description }}</p>
+            <div class="meta">
+                <p>Создано: {{ task.createdAt }}</p><br>
+                <p>Обновлено: {{ task.updatedAt }}</p><br>
+                <p>Дэдлайн: {{ task.deadline }}</p>
+                <div v-if="isOverdue" class="badge">Просрочено</div>
+                <div v-else-if="currentStatus === 'done'" class="badge success">В срок</div>
+            </div>
+            
+            <div class="actions">
+                <button @click="edit">Редактировать</button>
+                <button @click="remove">Удалить</button>
+                <button v-if="currentStatus === 'planned'" @click="move('in_progress')">В работу</button>
+                
+                <button v-if="currentStatus === 'in_progress'" @click="move('testing')">На тестирование</button>
+                
+                <button v-if="currentStatus === 'testing'" @click="move('done')">Готово</button>
+                <button v-if="currentStatus === 'testing'" @click="requestReturn">Вернуть в работу</button>
+            </div>
+            <p v-if="task.returnReason" class="reason">Причина возврата: {{ task.returnReason }}</p>
+        </div>
+`,
+    computed: {
+        isOverdue() {
+            if (this.currentStatus !== 'done') return false;
+            const now = new Date();
+            const deadline = new Date(this.task.deadline);
+            return now > deadline;
+        }
+    },
+    methods: {
+        move(newStatus) {
+            this.$emit('move-task', { id: this.task.id, status: newStatus, reason: '' });
+        },
+        requestReturn() {
+            const reason = prompt("Укажите причину возврата во второй столбец:");
+            if (reason) {
+                this.$emit('move-task', { id: this.task.id, status: 'in_progress', reason: reason });
+            }
+        },
+        edit() {
+            this.$emit('edit-task', this.task);
+        },
+        remove() {
+            this.$emit('delete-task', this.task.id);
+        }
+    }
+
+})
