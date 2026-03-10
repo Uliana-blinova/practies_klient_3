@@ -7,3 +7,24 @@ let app = new Vue({
 
     }
 })
+
+Vue.component('kanban-column', {
+    props:{
+        title:{
+            type:String,
+            required:true
+        },
+        status:{
+            type:String,
+            required:true
+        },
+        tasks:{
+            type:Array,
+            required:true
+        }
+    },
+    template: ``,
+    methods: {
+
+    }
+})
