@@ -1,0 +1,72 @@
+*{
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+body{
+    background: #604a3e;
+}
+.board {
+    display: flex;
+    gap: 20px;
+    padding: 20px;
+}
+.column {
+    background: #ebecf0;
+    border-radius: 5px;
+    width: 250px;
+    padding: 10px;
+    min-height: 400px;
+}
+.card {
+    background: #9e9090;
+    border-radius: 3px;
+    padding: 10px;
+    margin-bottom: 10px;
+}
+h1{
+    display: flex;
+    justify-content: center;
+    margin-top: 20px;
+}
+
+.add-btn,
+.btn{
+    background: #3c3126;
+    width: 130px;
+    height: 25px;
+    border: none;
+    border-radius: 10px;
+    color: #ebecf0;
+    margin-top: 20px;
+}
+
+form{
+    border-radius: 20px;
+    background: #ebecf0;
+    width: 300px;
+    min-height: 400px;
+    display: flex;
+    justify-content: center;
+    flex-direction: column;
+    align-items: center;
+}
+.form-group > label{
+    padding-top: 10px;
+    display: flex;
+    margin: 20px 10px;
+    font-weight: bold;
+    font-size: 18px;
+}
+input{
+    display: flex;
+    padding: 10px;
+    border: none;
+    border-radius: 6px;
+    box-sizing: border-box;
+    font-size: 14px;
+}
+.form-group > textarea {
+    display: flex;
+    margin: 20px 10px;
+}
