@@ -16,6 +16,8 @@ Vue.component('kanban-column', {
                     @move-task="moveTask"
                     @edit-task="editTask"
                     @delete-task="deleteTask"
+                    @update-checklist="updateChecklist"
+                    @archive-task="archiveTask"
                 ></task-card>
                 
                 <button v-if="status === 'planned'" class="add-btn" @click="createTask">+ Добавить задачу</button>
@@ -34,6 +36,12 @@ Vue.component('kanban-column', {
         },
         createTask() {
             this.$emit('create-task', this.status);
+        },
+        updateChecklist(payload) {
+            this.$emit('update-checklist', payload);
+        },
+        archiveTask(payload) {
+            this.$emit('archive-task', payload);
         }
     }
 });
@@ -48,6 +56,15 @@ Vue.component('task-card', {
     <div class="card">
             <h3>{{ task.title }}</h3>
             <p>{{ task.description }}</p>
+            <div class="checklist" v-if="task.checklist && task.checklist.length">
+                <h4>Пункты:</h4>
+                <label v-for="(item, index) in task.checklist" :key="index">
+                    <input type="checkbox" 
+                           :checked="task.checklistDone && task.checklistDone[index]" 
+                           @change="toggleChecklistItem(index)">
+                    {{ item }}
+                </label>
+            </div>
             <div class="meta">
                 <p>Создано: {{ task.createdAt }}</p>
                 <p>Обновлено: {{ task.updatedAt }}</p>
@@ -55,14 +72,14 @@ Vue.component('task-card', {
                 <div class="deadline-block">
                     <p>Дэдлайн: {{ formatDeadline(task.deadline) }}</p>
                     
-                    <p v-if="task.deadline" class="deadline-status" :class="isOverdue ? 'overdue' : 'on-time'">
+                    <p v-if="currentStatus === 'done' && task.deadline" class="deadline-status" :class="isOverdue ? 'overdue' : 'on-time'">
                         {{ isOverdue ? 'Просрочено' : 'Выполнено в срок' }}
                     </p>
                 </div>
             </div>
             
             <div class="actions">
-                <button @click="edit" class="btn">Редактировать</button>
+                <button v-if="currentStatus !== 'done' && currentStatus !== 'overdue'" @click="edit" class="btn">Редактировать</button>
                 
                 <button v-if="currentStatus === 'planned'" @click="remove" class="btn">Удалить</button>
                 
@@ -72,6 +89,8 @@ Vue.component('task-card', {
                 
                 <button v-if="currentStatus === 'testing'" @click="move('done')" class="btn">Готово</button>
                 <button v-if="currentStatus === 'testing'" @click="requestReturn" class="btn">Вернуть</button>
+                
+                <button v-if="currentStatus === 'done'" @click="archive" class="btn">В архив</button>
             </div>
             <p v-if="task.returnReason" class="reason">Причина возврата: {{ task.returnReason }}</p>
         </div>
@@ -79,7 +98,6 @@ Vue.component('task-card', {
     computed: {
         isOverdue() {
             if (!this.task.deadline) return false;
-
             const now = new Date();
             const deadline = new Date(this.task.deadline);
             return now > deadline;
@@ -98,6 +116,24 @@ Vue.component('task-card', {
             });
         },
         move(newStatus) {
+            if (newStatus === 'done') {
+                if (this.task.checklist && this.task.checklist.length > 0) {
+                    const checklistDone = this.task.checklistDone || [];
+                    let allDone = true;
+
+                    for (let i = 0; i < this.task.checklist.length; i++) {
+                        if (checklistDone[i] !== true) {
+                            allDone = false;
+                            break;
+                        }
+                    }
+
+                    if (!allDone) {
+                        alert('Нельзя завершить задачу, пока не выполнены все пункты');
+                        return;
+                    }
+                }
+            }
             this.$emit('move-task', { id: this.task.id, status: newStatus, reason: '' });
         },
         requestReturn() {
@@ -113,10 +149,23 @@ Vue.component('task-card', {
             if(confirm('Уверены, что хотите удалить задачу?')) {
                 this.$emit('delete-task', this.task.id);
             }
+        },
+        archive() {
+            if(confirm('Переместить задачу в архив?')) {
+                this.$emit('archive-task', { id: this.task.id });
+            }
+        },
+        toggleChecklistItem(index) {
+            const checklistDone = this.task.checklistDone || [];
+            checklistDone[index] = !checklistDone[index];
+
+            this.$emit('update-checklist', {
+                id: this.task.id,
+                checklistDone: checklistDone
+            });
         }
     }
 });
-
 Vue.component('task-form', {
     props: {
         task: { type: Object, required: true }
@@ -132,6 +181,21 @@ Vue.component('task-form', {
                 <div class="form-group">
                     <label>Описание:</label>
                     <textarea v-model="localTask.description" placeholder="Опишите задачу" required></textarea>
+                </div>
+                <div class="form-group">
+                    <label>Пункты проверки (макс. 3):</label>
+                    <div>
+                        <input v-model="newChecklistItem" placeholder="Введите пункт" 
+                               :disabled="localTask.checklist && localTask.checklist.length >= 3">
+                        <button type="button" @click="addChecklistItem" 
+                                :disabled="localTask.checklist && localTask.checklist.length >= 3">+</button>
+                    </div>
+                    <ul v-if="localTask.checklist && localTask.checklist.length">
+                        <li v-for="(item, index) in localTask.checklist" :key="index">
+                            {{ item }} 
+                            <button type="button" @click="removeChecklistItem(index)">×</button>
+                        </li>
+                    </ul>
                 </div>
                 <div class="form-group">
                     <label>Дэдлайн (дата и время):</label>
@@ -154,7 +218,8 @@ Vue.component('task-form', {
     data() {
         return {
             localTask: { ...this.task },
-            errors: []
+            errors: [],
+            newChecklistItem: ''
         }
     },
     methods: {
@@ -170,6 +235,20 @@ Vue.component('task-form', {
         },
         close() {
             this.$emit('close');
+        },
+        addChecklistItem() {
+            if (!this.localTask.checklist) this.localTask.checklist = [];
+            if (!this.localTask.checklistDone) this.localTask.checklistDone = [];
+
+            if (this.newChecklistItem.trim() && this.localTask.checklist.length < 3) {
+                this.localTask.checklist.push(this.newChecklistItem.trim());
+                this.localTask.checklistDone.push(false);
+                this.newChecklistItem = '';
+            }
+        },
+        removeChecklistItem(index) {
+            this.localTask.checklist.splice(index, 1);
+            this.localTask.checklistDone.splice(index, 1);
         }
     }
 });
@@ -178,6 +257,10 @@ Vue.component('task-form', {
 Vue.component('kanban-board', {
     template: `
         <div class="board">
+            <div>
+                <button @click="showArchive = true" class="btn-arx"> Архив ({{ archivedTasks.length }})</button>
+            </div>
+            
             <kanban-column 
                 v-for="col in columns" 
                 :key="col.status"
@@ -188,14 +271,41 @@ Vue.component('kanban-board', {
                 @edit-task="openEditForm"
                 @delete-task="deleteTask"
                 @create-task="openCreateForm"
+                @update-checklist="updateChecklist"
+                @archive-task="archiveTask"
             ></kanban-column>
             
-            <div v-if="showForm" class="modal">
+            <div v-if="showForm" class="modal-overlay" @click.self="showForm = false">
                 <task-form 
                     :task="currentTask" 
                     @submit="saveTask" 
-                    @cancel="showForm = false"
+                    @close="showForm = false"
                 ></task-form>
+            </div>
+            
+            <div v-if="showArchive" class="modal-overlay" @click.self="showArchive = false">
+                <div class="modal-content">
+                        <h2></h2> Архив задач
+                    <div v-if="archivedTasks.length === 0">
+                        <p>Архив пуст</p>
+                    </div>
+                    <div v-else class="archived-tasks">
+                        <div v-for="task in archivedTasks" :key="task.id" 
+                             class="archived-card">
+                            <h3>{{ task.title }}</h3>
+                            <p>{{ task.description }}</p>
+                            <p>
+                                <p>Завершено:</p> {{ task.completedAt }}
+                            </p>
+                            <p>В архиве: {{ task.archivedAt }}</p>
+                        </div>
+                    </div>
+                    <div>
+                        <button @click="showArchive = false" class="btn">
+                            Закрыть
+                        </button>
+                    </div>
+                </div>
             </div>
         </div>
     `,
@@ -205,16 +315,43 @@ Vue.component('kanban-board', {
                 { title: 'Запланированные задачи', status: 'planned' },
                 { title: 'Задачи в работе', status: 'in_progress' },
                 { title: 'Тестирование', status: 'testing' },
-                { title: 'Выполненные задачи', status: 'done' }
+                { title: 'Выполненные задачи', status: 'done' },
+                { title: ' Просроченные', status: 'overdue' }
             ],
             tasks: [],
             showForm: false,
+            showArchive: false,
             currentTask: null
+        }
+    },
+    computed: {
+        archivedTasks() {
+            return this.tasks.filter(t => t.archived === true);
         }
     },
     methods: {
         getTasksForStatus(status) {
-            return this.tasks.filter(t => t.status === status);
+            const activeTasks = this.tasks.filter(t => !t.archived);
+
+            if (status === 'overdue') {
+                return activeTasks.filter(t => {
+                    if (t.status !== 'done' || !t.deadline) return false;
+                    const now = new Date();
+                    const deadline = new Date(t.deadline);
+                    return now > deadline;
+                });
+            }
+
+            return activeTasks.filter(t => {
+                if (status === 'done') {
+                    if (t.deadline) {
+                        const now = new Date();
+                        const deadline = new Date(t.deadline);
+                        if (now > deadline) return false;
+                    }
+                }
+                return t.status === status;
+            });
         },
         moveTask(payload) {
             const task = this.tasks.find(t => t.id === payload.id);
@@ -231,13 +368,17 @@ Vue.component('kanban-board', {
                 if (payload.status === 'done') {
                     const now = new Date();
                     const deadline = new Date(task.deadline);
-
-                    if (now > deadline) {
-                        task.isOverdue = true;
-                    } else {
-                        task.isOverdue = false;
-                    }
+                    task.isOverdue = now > deadline;
+                    task.completedAt = new Date().toLocaleString('ru-RU');
                 }
+                this.saveToLocalStorage();
+            }
+        },
+        archiveTask(payload) {
+            const task = this.tasks.find(t => t.id === payload.id);
+            if (task) {
+                task.archived = true;
+                task.archivedAt = new Date().toLocaleString('ru-RU');
                 this.saveToLocalStorage();
             }
         },
@@ -252,7 +393,10 @@ Vue.component('kanban-board', {
                 deadline: '',
                 status: status,
                 returnReason: '',
-                isOverdue: false
+                isOverdue: false,
+                checklist: [],
+                checklistDone: [],
+                archived: false
             };
             this.showForm = true;
         },
@@ -268,20 +412,33 @@ Vue.component('kanban-board', {
                 taskData.status = originalTask.status;
                 taskData.createdAt = originalTask.createdAt;
                 taskData.isOverdue = originalTask.isOverdue;
+                taskData.checklist = originalTask.checklist;
+                taskData.checklistDone = originalTask.checklistDone;
+                taskData.archived = originalTask.archived || false;
                 taskData.updatedAt = new Date().toLocaleString('ru-RU');
                 this.tasks[existingIndex] = taskData;
             } else {
-
                 taskData.id = Date.now();
                 taskData.createdAt = new Date().toLocaleString('ru-RU');
                 taskData.updatedAt = new Date().toLocaleString('ru-RU');
                 taskData.isOverdue = false;
                 taskData.returnReason = '';
+                if (!taskData.checklist) taskData.checklist = [];
+                if (!taskData.checklistDone) taskData.checklistDone = [];
+                taskData.archived = false;
                 this.tasks.push(taskData);
             }
             this.showForm = false;
             this.currentTask = null;
             this.saveToLocalStorage();
+        },
+        updateChecklist(payload) {
+            const task = this.tasks.find(t => t.id === payload.id);
+            if (task) {
+                task.checklistDone = payload.checklistDone;
+                task.updatedAt = new Date().toLocaleString('ru-RU');
+                this.saveToLocalStorage();
+            }
         },
         saveToLocalStorage() {
             try {
@@ -296,7 +453,12 @@ Vue.component('kanban-board', {
                 if (saved) {
                     const parsed = JSON.parse(saved);
                     if (Array.isArray(parsed)) {
-                        this.tasks = parsed;
+                        this.tasks = parsed.map(task => ({
+                            ...task,
+                            archived: task.archived || false,
+                            checklist: task.checklist || [],
+                            checklistDone: task.checklistDone || []
+                        }));
                     }
                 }
             } catch (e) {
